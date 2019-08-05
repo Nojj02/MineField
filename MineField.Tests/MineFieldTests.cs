@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using Xunit;
 
@@ -121,143 +119,31 @@ namespace MineField.Tests
 
         public string PlaceMines(MineFieldInput fieldInput)
         {
-            var directions = new List<Direction>
-            {
-                Direction.North,
-                Direction.North | Direction.West,
-                Direction.East,
-                Direction.North | Direction.East,
-                Direction.West,
-                Direction.South | Direction.West,
-                Direction.South,
-                Direction.South | Direction.East
-            };
-
-            var resultCharList = new List<char>();
+            var fieldOutput = new MineFieldOutput();
+            
             for (var y = 0; y < fieldInput.RowCount; y++)
             {
                 if (y > 0)
                 {
-                    resultCharList.Add('\n');
+                    fieldOutput.AddNewRow();
                 }
 
                 for (var x = 0; x < fieldInput.ColumnLength; x++)
                 {
                     if (fieldInput.HasMine(x, y))
                     {
-                        resultCharList.Add('*');
+                        fieldOutput.SetMine();
                     }
                     else
                     {
-                        var numberOfAdjacentMines = 0;
-                        foreach (var direction in directions)
-                        {
-                            if (!fieldInput.IsAtEdge(x, y, direction) && fieldInput.HasMineInAdjacentCell(x, y, direction))
-                            {
-                                numberOfAdjacentMines++;
-                            }
-                        }
+                        var numberOfAdjacentMines = fieldInput.GetNumberOfAdjacentMines(x, y);
 
-                        resultCharList.Add(numberOfAdjacentMines.ToString()[0]);
+                        fieldOutput.SetNumberOfAdjacentMines(numberOfAdjacentMines);
                     }
                 }
             }
 
-            return new string(resultCharList.ToArray());
+            return fieldOutput.ToString();
         }
-    }
-
-    public class MineFieldInput
-    {
-        private readonly char[][] _fieldInput;
-        
-        public MineFieldInput(string fieldInput)
-        {
-            var fieldInputRows = fieldInput.Split('\n');
-            _fieldInput = fieldInputRows.Select(x => x.ToCharArray()).ToArray();
-        }
-
-        public int ColumnLength => _fieldInput[0].Length;
-        public int RowCount => _fieldInput.Length;
-
-        public bool IsAtEdge(int x, int y, Direction edge)
-        {
-            var conditions = new List<Func<bool>>();
-
-            if (edge.HasFlag(Direction.North))
-            {
-                conditions.Add(() => y == 0);
-            }
-
-            if (edge.HasFlag(Direction.East))
-            {
-                conditions.Add(() => x == ColumnLength - 1);
-            }
-
-            if (edge.HasFlag(Direction.West))
-            {
-                conditions.Add(() => x == 0);
-            }
-
-            if (edge.HasFlag(Direction.South))
-            {
-                conditions.Add(() => y == RowCount - 1);
-            }
-
-            foreach (var condition in conditions)
-            {
-                if (condition())
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        public bool HasMine(int x, int y)
-        {
-            return _fieldInput[y][x] == '*';
-        }
-
-
-        public bool HasMineInAdjacentCell(int x, int y, Direction direction)
-        {
-            int adjacentCellX = x;
-            int adjacentCellY = y;
-
-            if (direction.HasFlag(Direction.North))
-            {
-                adjacentCellY = y - 1;
-            }
-
-            if (direction.HasFlag(Direction.East))
-            {
-                adjacentCellX = x + 1;
-            }
-
-            if (direction.HasFlag(Direction.West))
-            {
-                adjacentCellX = x - 1;
-            }
-
-            if (direction.HasFlag(Direction.South))
-            {
-                adjacentCellY = y + 1;
-            }
-
-
-            return HasMine(adjacentCellX, adjacentCellY);
-        }
-    }
-
-    [Flags]
-    public enum Direction
-    {
-        Unknown = 0,
-        North = 1,
-        East = 2, 
-        West = 4,
-        South = 8
     }
 }
