@@ -6,7 +6,7 @@ using Xunit;
 
 namespace MineField.Tests
 {
-    public class UnitTest1
+    public class MineFieldTests
     {
         [Fact]
         public void FieldIs1x1_ThereIsASingleMine()
