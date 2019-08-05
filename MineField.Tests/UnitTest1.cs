@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace MineField.Tests
@@ -17,7 +18,7 @@ namespace MineField.Tests
         }
 
         [Fact]
-        public void FieldIs1x1_ThereIsANoMine()
+        public void FieldIs1x1_ThereIsNoMine()
         {
             var field = new MineField(1, 1);
             var result = field.PlaceMines(new MineFieldInput("."));
@@ -35,12 +36,80 @@ namespace MineField.Tests
         }
 
         [Fact]
-        public void FieldIs1x2_ThereIsASingleMineAt1x2()
+        public void FieldIs2x1_ThereIsASingleMineAt2x1()
         {
             var field = new MineField(2, 1);
             var result = field.PlaceMines(new MineFieldInput(".*"));
 
             Assert.Equal("1*", result);
+        }
+
+        [Fact]
+        public void FieldIs3x1_ThereIsASingleMineAt1x1()
+        {
+            var field = new MineField(3, 1);
+            var result = field.PlaceMines(new MineFieldInput("*.."));
+
+            Assert.Equal("*10", result);
+        }
+
+        [Fact]
+        public void FieldIs3x1_ThereIsASingleMineAt2x1()
+        {
+            var field = new MineField(3, 1);
+            var result = field.PlaceMines(new MineFieldInput(".*."));
+
+            Assert.Equal("1*1", result);
+        }
+
+        [Fact]
+        public void FieldIs3x1_ThereIsASingleMineAt3x1()
+        {
+            var field = new MineField(3, 1);
+            var result = field.PlaceMines(new MineFieldInput("..*"));
+
+            Assert.Equal("01*", result);
+        }
+
+        [Fact]
+        public void FieldIs3x1_ThereAreMinesAt1x1And3x1()
+        {
+            var field = new MineField(3, 1);
+            var result = field.PlaceMines(new MineFieldInput("*.*"));
+
+            Assert.Equal("*2*", result);
+        }
+
+        [Fact]
+        public void FieldIs2x2_ThereIsASingleMineAt1x1()
+        {
+            var field = new MineField(2, 2);
+            var result = field.PlaceMines(
+                new MineFieldInput(fieldInput:
+                    "*.\n" +
+                    ".."));
+
+            var expectedResult = 
+                "*1\n" +
+                "11";
+            Assert.Equal(expectedResult, result);
+        }
+
+        [Fact]
+        public void FieldIs3x3_ThereIsAMineAtCenter()
+        {
+            var field = new MineField(3, 3);
+            var result = field.PlaceMines(
+                new MineFieldInput(fieldInput:
+                    "...\n" +
+                    ".*.\n" +
+                    "..."));
+
+            var expectedResult = 
+                "111\n" +
+                "1*1\n" +
+                "111";
+            Assert.Equal(expectedResult, result);
         }
     }
 
@@ -52,24 +121,44 @@ namespace MineField.Tests
 
         public string PlaceMines(MineFieldInput fieldInput)
         {
-            var resultCharList = new List<char>();
-            for(var x = 0; x < fieldInput.Length; x++)
+            var directions = new List<Direction>
             {
-                if (fieldInput.HasMine(x))
+                Direction.North,
+                Direction.North | Direction.West,
+                Direction.East,
+                Direction.North | Direction.East,
+                Direction.West,
+                Direction.South | Direction.West,
+                Direction.South,
+                Direction.South | Direction.East
+            };
+
+            var resultCharList = new List<char>();
+            for (var y = 0; y < fieldInput.RowCount; y++)
+            {
+                if (y > 0)
                 {
-                    resultCharList.Add('*');
+                    resultCharList.Add('\n');
                 }
-                else
+
+                for (var x = 0; x < fieldInput.ColumnLength; x++)
                 {
-                    if (!fieldInput.IsAtEdge(x, Edge.West) && fieldInput.HasMineInAdjacentCell(x, Direction.West)
-                        || !fieldInput.IsAtEdge(x, Edge.East) && fieldInput.HasMineInAdjacentCell(x, Direction.East)
-                        )
+                    if (fieldInput.HasMine(x, y))
                     {
-                        resultCharList.Add('1');
+                        resultCharList.Add('*');
                     }
                     else
                     {
-                        resultCharList.Add('0');
+                        var numberOfAdjacentMines = 0;
+                        foreach (var direction in directions)
+                        {
+                            if (!fieldInput.IsAtEdge(x, y, direction) && fieldInput.HasMineInAdjacentCell(x, y, direction))
+                            {
+                                numberOfAdjacentMines++;
+                            }
+                        }
+
+                        resultCharList.Add(numberOfAdjacentMines.ToString()[0]);
                     }
                 }
             }
@@ -80,72 +169,95 @@ namespace MineField.Tests
 
     public class MineFieldInput
     {
-        private readonly char[] _fieldInput;
-
-        public MineFieldInput(char[] fieldInput)
-        {
-            _fieldInput = fieldInput;
-        }
-
+        private readonly char[][] _fieldInput;
+        
         public MineFieldInput(string fieldInput)
-            : this(fieldInput.ToCharArray())
         {
-
+            var fieldInputRows = fieldInput.Split('\n');
+            _fieldInput = fieldInputRows.Select(x => x.ToCharArray()).ToArray();
         }
 
-        public int Length => _fieldInput.Length;
+        public int ColumnLength => _fieldInput[0].Length;
+        public int RowCount => _fieldInput.Length;
 
-        public bool IsAtEdge(int x, Edge edge)
+        public bool IsAtEdge(int x, int y, Direction edge)
         {
-            if (edge == Edge.West)
+            var conditions = new List<Func<bool>>();
+
+            if (edge.HasFlag(Direction.North))
             {
-                return x == 0;
+                conditions.Add(() => y == 0);
             }
 
-            if (edge == Edge.East)
+            if (edge.HasFlag(Direction.East))
             {
-                return x == _fieldInput.Length - 1;
+                conditions.Add(() => x == ColumnLength - 1);
             }
 
-            throw new InvalidOperationException("Unknown edge");
+            if (edge.HasFlag(Direction.West))
+            {
+                conditions.Add(() => x == 0);
+            }
+
+            if (edge.HasFlag(Direction.South))
+            {
+                conditions.Add(() => y == RowCount - 1);
+            }
+
+            foreach (var condition in conditions)
+            {
+                if (condition())
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
-        public bool HasMine(int x)
+        public bool HasMine(int x, int y)
         {
-            return _fieldInput[x] == '*';
+            return _fieldInput[y][x] == '*';
         }
 
 
-        public bool HasMineInAdjacentCell(int x, Direction direction)
+        public bool HasMineInAdjacentCell(int x, int y, Direction direction)
         {
-            int adjacentCellX;
-            if (direction == Direction.West)
+            int adjacentCellX = x;
+            int adjacentCellY = y;
+
+            if (direction.HasFlag(Direction.North))
             {
-                adjacentCellX = x - 1;
+                adjacentCellY = y - 1;
             }
-            else if (direction == Direction.East)
+
+            if (direction.HasFlag(Direction.East))
             {
                 adjacentCellX = x + 1;
             }
-            else
+
+            if (direction.HasFlag(Direction.West))
             {
-                throw new InvalidOperationException("Unsupported direction");
+                adjacentCellX = x - 1;
             }
 
-            return HasMine(adjacentCellX);
+            if (direction.HasFlag(Direction.South))
+            {
+                adjacentCellY = y + 1;
+            }
+
+
+            return HasMine(adjacentCellX, adjacentCellY);
         }
     }
 
+    [Flags]
     public enum Direction
     {
         Unknown = 0,
-        East = 1, 
-        West = 2
-    }
-
-    public enum Edge
-    {
-        East,
-        West
+        North = 1,
+        East = 2, 
+        West = 4,
+        South = 8
     }
 }
